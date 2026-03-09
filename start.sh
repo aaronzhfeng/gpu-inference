@@ -5,6 +5,7 @@ MODEL="${MODEL:-Qwen/Qwen3.5-4B}"
 ENGINE="${ENGINE:-vllm}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
 GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.9}"
+SWAP_SPACE="${SWAP_SPACE:-2}"
 PORT="${PORT:-8000}"
 HF_HOME="${HF_HOME:-/workspace/models}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
@@ -19,6 +20,7 @@ echo " Model:     ${MODEL}"
 echo " Max len:   ${MAX_MODEL_LEN}"
 echo " GPU util:  ${GPU_MEMORY_UTILIZATION}"
 echo " Port:      ${PORT}"
+echo " Swap space: ${SWAP_SPACE}GB"
 echo " Cache dir: ${HF_HOME}"
 echo "==========================================="
 
@@ -40,6 +42,7 @@ if [ "${ENGINE}" = "vllm" ]; then
         --model "${MODEL}" \
         --max-model-len "${MAX_MODEL_LEN}" \
         --gpu-memory-utilization "${GPU_MEMORY_UTILIZATION}" \
+        --swap-space "${SWAP_SPACE}" \
         --port "${PORT}" \
         --trust-remote-code \
         ${EXTRA_ARGS}
