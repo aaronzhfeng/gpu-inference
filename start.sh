@@ -1,10 +1,20 @@
 #!/bin/bash
 set -e
 
+# Use persistent venv from /workspace
+VENV="/workspace/.persist/venv"
+if [ -d "$VENV" ]; then
+    source "$VENV/bin/activate"
+else
+    echo "ERROR: venv not found at $VENV"
+    echo "Run: python -m venv $VENV && $VENV/bin/pip install vllm huggingface_hub[cli]"
+    exit 1
+fi
+
 MODEL="${MODEL:-Qwen/Qwen3.5-4B}"
 ENGINE="${ENGINE:-vllm}"
-MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.9}"
+MAX_MODEL_LEN="${MAX_MODEL_LEN:-2048}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.95}"
 PORT="${PORT:-8000}"
 HF_HOME="${HF_HOME:-/workspace/models}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
