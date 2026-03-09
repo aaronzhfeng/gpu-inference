@@ -1,0 +1,33 @@
+# Model presets — use MODEL env var to select by key or full HF repo path.
+# These are reference defaults; env vars always override.
+
+presets:
+  qwen3.5-0.8b:
+    repo: Qwen/Qwen3.5-0.8B
+    max_model_len: 4096
+    gpu_memory_utilization: 0.85
+    notes: "Non-thinking mode by default. ~1.6GB VRAM."
+
+  qwen3.5-2b:
+    repo: Qwen/Qwen3.5-2B
+    max_model_len: 4096
+    gpu_memory_utilization: 0.85
+    notes: "Non-thinking mode by default. ~4GB VRAM."
+
+  qwen3.5-4b:
+    repo: Qwen/Qwen3.5-4B
+    max_model_len: 4096
+    gpu_memory_utilization: 0.9
+    notes: "Sweet spot for cost/quality. ~8GB VRAM."
+
+  qwen3.5-9b:
+    repo: Qwen/Qwen3.5-9B
+    max_model_len: 4096
+    gpu_memory_utilization: 0.9
+    notes: "Thinking mode by default. ~18GB VRAM."
+
+  qwen2.5-7b:
+    repo: Qwen/Qwen2.5-7B-Instruct
+    max_model_len: 4096
+    gpu_memory_utilization: 0.9
+    notes: "Current RRMC baseline model. ~14GB VRAM."
