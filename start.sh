@@ -19,6 +19,15 @@ SWAP_SPACE="${SWAP_SPACE:-2}"
 PORT="${PORT:-8000}"
 HF_HOME="${HF_HOME:-/workspace/models}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
+ENABLE_THINKING="${ENABLE_THINKING:-false}"
+
+# For Qwen3.5 models: disable thinking/reasoning by default
+# Set ENABLE_THINKING=true to re-enable <think> blocks
+if [ "${ENABLE_THINKING}" = "false" ]; then
+    THINKING_ARGS="--default-chat-template-kwargs {\"enable_thinking\":false}"
+else
+    THINKING_ARGS=""
+fi
 
 export HF_HOME
 
@@ -31,6 +40,7 @@ echo " Max len:   ${MAX_MODEL_LEN}"
 echo " GPU util:  ${GPU_MEMORY_UTILIZATION}"
 echo " Port:      ${PORT}"
 echo " Swap space: ${SWAP_SPACE}GB"
+echo " Thinking:  ${ENABLE_THINKING}"
 echo " Cache dir: ${HF_HOME}"
 echo "==========================================="
 
@@ -55,6 +65,7 @@ if [ "${ENGINE}" = "vllm" ]; then
         --swap-space "${SWAP_SPACE}" \
         --port "${PORT}" \
         --trust-remote-code \
+        ${THINKING_ARGS} \
         ${EXTRA_ARGS}
 
 elif [ "${ENGINE}" = "sglang" ]; then
