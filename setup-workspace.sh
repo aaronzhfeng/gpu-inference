@@ -12,6 +12,11 @@ VENV="$PERSIST/venv"
 
 echo "=== Workspace Setup ==="
 
+# ── System packages ──────────────────────────────────────────
+echo "  Installing system packages..."
+apt-get update -qq && apt-get install -y -qq nvtop libnuma1 2>/dev/null
+echo "  System packages ready"
+
 # ── Python venv (vllm + deps) ──────────────────────────────
 if [ -d "$VENV/bin" ]; then
     echo "  Python venv ready"
