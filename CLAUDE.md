@@ -39,18 +39,37 @@ This server is consumed by the [RRMC](https://github.com/aaronzhfeng/RRMC) proje
 - Use `--provider selfhosted --base_url http://<pod-ip>:8000/v1` when running RRMC experiments
 - The OpenAI SDK client in RRMC's `LLMWrapper` works identically with vLLM/SGLang endpoints
 
-## Quick Deploy: Qwen3.5-4B (No Reasoning)
+## Quick Deploy: Qwen3.5-9B (With Reasoning)
 
 ### Prerequisites
 - venv at `/workspace/.persist/venv` with `vllm` and `huggingface_hub[cli]` installed
 - Model weights cached at `/workspace/models` (HF_HOME)
-- GPU: RTX 4090 (24 GB) — model uses ~8.6 GB VRAM
+- GPU: RTX 4090 (24 GB) — model uses ~17.7 GB VRAM
 
 ### Launch Command
 
 ```bash
 source /workspace/.persist/venv/bin/activate && \
 export HF_HOME=/workspace/models && \
+python -m vllm.entrypoints.openai.api_server \
+    --model Qwen/Qwen3.5-9B \
+    --max-model-len 4096 \
+    --gpu-memory-utilization 0.85 \
+    --swap-space 2 \
+    --port 8000 \
+    --trust-remote-code \
+    --enforce-eager
+```
+
+**Key flags:**
+- `--enforce-eager` — **required** for Qwen3.5-9B on RTX 4090. Without it, vLLM 0.17.0 crashes during CUDA graph capture with `AssertionError: num_cache_lines >= batch` in `causal_conv1d_update` (Mamba state cache too small after 17.7 GiB model load)
+- `--gpu-memory-utilization 0.85` — slightly lower than default to leave headroom for Mamba state cache
+- Thinking/reasoning is enabled by default (no `--default-chat-template-kwargs` needed)
+
+### Qwen3.5-4B Alternative (No Reasoning)
+
+For the smaller 4B model without thinking, use:
+```bash
 python -m vllm.entrypoints.openai.api_server \
     --model Qwen/Qwen3.5-4B \
     --max-model-len 4096 \
@@ -60,14 +79,13 @@ python -m vllm.entrypoints.openai.api_server \
     --trust-remote-code \
     --default-chat-template-kwargs '{"enable_thinking": false}'
 ```
-
-**Key flags:**
-- `--default-chat-template-kwargs '{"enable_thinking": false}'` — disables Qwen3.5 reasoning/thinking mode so responses are direct (no `<think>` blocks)
-- Do NOT use `--chat-template-kwargs` (invalid in vLLM 0.17.0; the correct flag is `--default-chat-template-kwargs`)
+- `--default-chat-template-kwargs '{"enable_thinking": false}'` disables `<think>` blocks
+- Do NOT use `--chat-template-kwargs` (invalid in vLLM 0.17.0)
+- 4B does NOT need `--enforce-eager` (only ~8.6 GB VRAM, enough room for CUDA graphs)
 
 ### Startup Time
-- ~3 min on first launch (model load + torch.compile + CUDA graph capture)
-- Subsequent launches faster if torch compile cache exists at `~/.cache/vllm/torch_compile_cache/`
+- ~3 min on first launch (model load + profiling)
+- `--enforce-eager` skips torch.compile and CUDA graph capture, so startup is slightly faster
 
 ### Verify It's Running
 
@@ -81,9 +99,9 @@ curl -s http://localhost:8000/health
 | Field | Value |
 |---|---|
 | Base URL | `http://localhost:8000/v1` |
-| Model name | `Qwen/Qwen3.5-4B` |
+| Model name | `Qwen/Qwen3.5-9B` |
 | Max context | 4,096 tokens |
-| Max concurrency | ~61 parallel requests at full context |
+| Thinking | Enabled (reasoning in responses) |
 | Auth | None (no API key required) |
 
 **Chat completions:**
@@ -91,7 +109,7 @@ curl -s http://localhost:8000/health
 curl http://localhost:8000/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "Qwen/Qwen3.5-4B",
+    "model": "Qwen/Qwen3.5-9B",
     "messages": [{"role": "user", "content": "Hello!"}],
     "max_tokens": 256
   }'
@@ -102,7 +120,7 @@ curl http://localhost:8000/v1/chat/completions \
 from openai import OpenAI
 client = OpenAI(base_url="http://localhost:8000/v1", api_key="unused")
 response = client.chat.completions.create(
-    model="Qwen/Qwen3.5-4B",
+    model="Qwen/Qwen3.5-9B",
     messages=[{"role": "user", "content": "Hello!"}],
     max_tokens=256,
 )
