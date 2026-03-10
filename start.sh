@@ -21,6 +21,8 @@ HF_HOME="${HF_HOME:-/workspace/models}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
 ENABLE_THINKING="${ENABLE_THINKING:-true}"
 ENFORCE_EAGER="${ENFORCE_EAGER:-true}"
+QUANTIZATION="${QUANTIZATION:-}"
+TENSOR_PARALLEL="${TENSOR_PARALLEL:-1}"
 
 # Thinking: enabled by default for Qwen3.5-9B
 # Set ENABLE_THINKING=false to disable <think> blocks (useful for 4B)
@@ -38,6 +40,20 @@ else
     EAGER_ARGS=""
 fi
 
+# Quantization: awq, gptq, fp8, etc. Leave empty for no quantization (bf16)
+if [ -n "${QUANTIZATION}" ]; then
+    QUANT_ARGS="--quantization ${QUANTIZATION}"
+else
+    QUANT_ARGS=""
+fi
+
+# Tensor parallelism: for multi-GPU setups
+if [ "${TENSOR_PARALLEL}" -gt 1 ] 2>/dev/null; then
+    TP_ARGS="--tensor-parallel-size ${TENSOR_PARALLEL}"
+else
+    TP_ARGS=""
+fi
+
 export HF_HOME
 
 echo "==========================================="
@@ -51,6 +67,8 @@ echo " Port:      ${PORT}"
 echo " Swap space: ${SWAP_SPACE}GB"
 echo " Thinking:  ${ENABLE_THINKING}"
 echo " Eager:     ${ENFORCE_EAGER}"
+echo " Quant:     ${QUANTIZATION:-none}"
+echo " TP size:   ${TENSOR_PARALLEL}"
 echo " Cache dir: ${HF_HOME}"
 echo "==========================================="
 
@@ -77,6 +95,8 @@ if [ "${ENGINE}" = "vllm" ]; then
         --trust-remote-code \
         ${THINKING_ARGS} \
         ${EAGER_ARGS} \
+        ${QUANT_ARGS} \
+        ${TP_ARGS} \
         ${EXTRA_ARGS}
 
 elif [ "${ENGINE}" = "sglang" ]; then
