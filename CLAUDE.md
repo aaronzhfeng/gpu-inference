@@ -205,8 +205,49 @@ vLLM is 1.2–2.6x faster, especially at high concurrency. Likely because Qwen3.
 - SGLang binds to `127.0.0.1` by default (not `0.0.0.0`); add `--host 0.0.0.0` for external access
 - The 50 GB network volume quota is tight with both engines installed (~23 GB venv + 27 GB models)
 
+## GPU Selection Guide (RunPod, as of 2026-03-10)
+
+Pick GPU based on which model you want to run. Sorted by value (bandwidth per dollar).
+
+### For Qwen3.5-4B / 9B (need 24 GB VRAM)
+
+| GPU | VRAM | Mem BW | $/hr | Notes |
+|---|---|---|---|---|
+| **RTX A5000** | 24 GB | 768 GB/s | $0.16 | Cheapest. Great for 4B. |
+| **RTX 3090** | 24 GB | 936 GB/s | $0.22 | Best speed/$ for 9B. |
+| RTX 4090 | 24 GB | 1,008 GB/s | $0.34 | Fastest 24 GB. |
+| L4 | 24 GB | 300 GB/s | $0.44 | Slow, skip. |
+
+### For Qwen3.5-27B-FP8 (need 48 GB VRAM)
+
+| GPU | VRAM | Mem BW | $/hr | Notes |
+|---|---|---|---|---|
+| **RTX A6000** | 48 GB | 768 GB/s | $0.33 | Best value. |
+| A40 | 48 GB | 696 GB/s | $0.35 | Slightly worse than A6000. |
+| RTX 6000 Ada | 48 GB | 960 GB/s | $0.74 | Fastest 48 GB. |
+| L40S | 48 GB | 864 GB/s | $0.79 | Overpriced. |
+
+### For Qwen3.5-27B bf16 or larger (need 80+ GB VRAM)
+
+| GPU | VRAM | Mem BW | $/hr | Notes |
+|---|---|---|---|---|
+| **A100 PCIe** | 80 GB | 2,039 GB/s | $1.19 | Best value 80 GB. |
+| A100 SXM | 80 GB | 2,039 GB/s | $1.39 | NVLink for multi-GPU. |
+| H100 SXM | 80 GB | 3,350 GB/s | $2.69 | Max speed. |
+
+### Quick recommendation
+
+| Model | Best GPU | $/hr |
+|---|---|---|
+| Qwen3.5-4B | RTX A5000 | $0.16 |
+| Qwen3.5-9B | RTX 3090 | $0.22 |
+| Qwen3.5-27B-FP8 | RTX A6000 | $0.33 |
+| Qwen3.5-27B (bf16) | A100 PCIe | $1.19 |
+
+> LLM inference is memory-bandwidth bound. More bandwidth = more tok/s. Prices from RunPod on-demand (March 2026), may vary.
+
 ## Development Notes
 
 - No test suite. Validate by starting the container and hitting the `/v1/models` endpoint
 - `EXTRA_ARGS` env var passes arbitrary CLI flags to the engine (e.g., `--quantization awq`)
-- Benchmark script: `/workspace/benchmark.py` — async concurrency sweep against the running server
+- Benchmark script: `/workspace/gpu-inference/benchmark.py` — async concurrency sweep against the running server
