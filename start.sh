@@ -11,22 +11,31 @@ else
     exit 1
 fi
 
-MODEL="${MODEL:-Qwen/Qwen3.5-4B}"
+MODEL="${MODEL:-Qwen/Qwen3.5-9B}"
 ENGINE="${ENGINE:-vllm}"
 MAX_MODEL_LEN="${MAX_MODEL_LEN:-4096}"
-GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.9}"
+GPU_MEMORY_UTILIZATION="${GPU_MEMORY_UTILIZATION:-0.85}"
 SWAP_SPACE="${SWAP_SPACE:-2}"
 PORT="${PORT:-8000}"
 HF_HOME="${HF_HOME:-/workspace/models}"
 EXTRA_ARGS="${EXTRA_ARGS:-}"
-ENABLE_THINKING="${ENABLE_THINKING:-false}"
+ENABLE_THINKING="${ENABLE_THINKING:-true}"
+ENFORCE_EAGER="${ENFORCE_EAGER:-true}"
 
-# For Qwen3.5 models: disable thinking/reasoning by default
-# Set ENABLE_THINKING=true to re-enable <think> blocks
+# Thinking: enabled by default for Qwen3.5-9B
+# Set ENABLE_THINKING=false to disable <think> blocks (useful for 4B)
 if [ "${ENABLE_THINKING}" = "false" ]; then
     THINKING_ARGS="--default-chat-template-kwargs {\"enable_thinking\":false}"
 else
     THINKING_ARGS=""
+fi
+
+# Enforce eager: required for Qwen3.5-9B on RTX 4090 (CUDA graph capture bug)
+# Set ENFORCE_EAGER=false for smaller models like 4B that work with CUDA graphs
+if [ "${ENFORCE_EAGER}" = "true" ]; then
+    EAGER_ARGS="--enforce-eager"
+else
+    EAGER_ARGS=""
 fi
 
 export HF_HOME
@@ -41,6 +50,7 @@ echo " GPU util:  ${GPU_MEMORY_UTILIZATION}"
 echo " Port:      ${PORT}"
 echo " Swap space: ${SWAP_SPACE}GB"
 echo " Thinking:  ${ENABLE_THINKING}"
+echo " Eager:     ${ENFORCE_EAGER}"
 echo " Cache dir: ${HF_HOME}"
 echo "==========================================="
 
@@ -66,6 +76,7 @@ if [ "${ENGINE}" = "vllm" ]; then
         --port "${PORT}" \
         --trust-remote-code \
         ${THINKING_ARGS} \
+        ${EAGER_ARGS} \
         ${EXTRA_ARGS}
 
 elif [ "${ENGINE}" = "sglang" ]; then
