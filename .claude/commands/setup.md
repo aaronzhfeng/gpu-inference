@@ -17,7 +17,7 @@ Check if `/workspace/.persist/venv/bin/activate` exists.
 python3 -m venv /workspace/.persist/venv
 source /workspace/.persist/venv/bin/activate
 pip install --upgrade pip
-pip install vllm huggingface_hub[cli] aiohttp --no-cache-dir
+pip install vllm huggingface_hub[cli] aiohttp
 ```
 
 If the venv already exists but `aiohttp` is missing, install it:
