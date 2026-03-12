@@ -24,7 +24,7 @@ else
     echo "  Creating Python venv and installing vllm..."
     python -m venv "$VENV"
     "$VENV/bin/pip" install --upgrade pip
-    "$VENV/bin/pip" install vllm huggingface_hub[cli] --no-cache-dir
+    "$VENV/bin/pip" install vllm huggingface_hub[cli] aiohttp
     echo "  vllm installed"
 fi
 
