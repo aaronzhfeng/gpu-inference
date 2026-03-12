@@ -219,6 +219,8 @@ python /workspace/gpu-inference/benchmark.py
 | A100-80GB | Qwen3.5-27B | bf16 | TBD | TBD | |
 | A100-80GB | Qwen3.5-27B-FP8 | fp8 | TBD | TBD | |
 | H100-80GB | Qwen3.5-27B-FP8 | fp8 | TBD | TBD | |
+| A40 (48 GB) | Qwen3.5-27B-FP8 | fp8 | ~398 | 32–64 | enforce-eager required, ~37.5 GB VRAM |
+| A40 (48 GB) | Qwen3.5-9B | bf16 | ~1,238 | 64 | CUDA graphs OK, ~17.7 GB model + large KV cache |
 
 > Fill in TBD entries as you benchmark on new GPUs. Add new rows for new GPU + model combos.
 

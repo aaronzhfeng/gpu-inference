@@ -28,7 +28,7 @@ models.yaml     # Reference presets (model sizes, VRAM estimates)
 ## RunPod Deployment
 
 - Use a **network volume** mounted at `/workspace` so model weights persist across pod restarts
-- Recommended GPU: **RTX 4090** ($0.44/hr) for Qwen3.5-4B/9B
+- Recommended GPU: **RTX 4090** ($0.44/hr) for Qwen3.5-4B/9B, **A40** ($0.38/hr) for Qwen3.5-27B-FP8
 - First boot: ~2min (model download). Subsequent boots: ~30s (cached)
 - Build and push the Docker image, create a RunPod template pointing to it
 
