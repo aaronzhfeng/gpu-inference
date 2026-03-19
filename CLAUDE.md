@@ -9,17 +9,19 @@ Primary use case: serving Qwen3.5 small models (0.8B–9B) for high-concurrency 
 ## Structure
 
 ```
-Dockerfile      # CUDA 12.4 + vLLM + SGLang, single image
-start.sh        # Entrypoint: cache check → model download → launch engine
-models.yaml     # Reference presets (model sizes, VRAM estimates)
-.env.example    # Environment variable template
+init.sh              # Run first on any new pod: installs Claude Code, restores ephemeral state
+start.sh             # Launch inference: cache check → model download → start engine
+Dockerfile           # CUDA 12.4 + vLLM + SGLang, single image (for Docker-based deploys)
+models.yaml          # Reference presets (model sizes, VRAM estimates)
+.env.example         # Environment variable template
 ```
 
 ## How It Works
 
 1. All config via env vars: `ENGINE`, `MODEL`, `MAX_MODEL_LEN`, `GPU_MEMORY_UTILIZATION`, `PORT`, `ENABLE_THINKING`, `EXTRA_ARGS`
-2. `setup-workspace.sh` bootstraps the full environment (system packages, Python venv, Claude Code)
-3. `start.sh` checks if model weights are cached at `$HF_HOME` (`/workspace/models` by default)
+2. `init.sh` restores ephemeral state (Claude Code, system packages, PATH) on any new pod
+3. `/setup` slash command bootstraps the full environment (Python venv, model download)
+4. `start.sh` checks if model weights are cached at `$HF_HOME` (`/workspace/models` by default)
 4. Downloads from HuggingFace if not cached
 5. Launches vLLM or SGLang based on `$ENGINE`
 6. Both engines serve the same OpenAI-compatible API on `$PORT`
@@ -144,45 +146,42 @@ MODEL=Qwen/Qwen3.5-9B ENABLE_THINKING=true bash /workspace/gpu-inference/start.s
 
 ## New Workspace Bootstrap (From Scratch)
 
-### Quickest path (with Claude Code):
+### Any new pod (first time or returning):
 
 ```bash
-git clone <this-repo> /workspace/gpu-inference
 cd /workspace/gpu-inference
-npm install -g @anthropic-ai/claude-code
+./init.sh
 claude
-# then type: /setup
+# first time: type /setup (installs venv, downloads model, launches server)
+# returning:  type /deploy (pick a model and launch)
 ```
 
-The `/setup` slash command (`.claude/commands/setup.md`) handles everything:
-1. Installs system packages (nvtop)
-2. Creates Python venv with vllm at `/workspace/.persist/venv/`
-3. Downloads Qwen3.5-4B model weights to `/workspace/models/`
-4. Launches the inference server on port 8000 (thinking disabled)
-5. Verifies health and reports connection info
+`init.sh` installs Claude Code, restores system packages, links config, and hooks itself into `.bashrc` for future logins. It's the only script you need to run manually.
 
-### Manual path (without Claude Code):
+### What `/setup` does (first time only):
+1. Creates Python venv with vllm at `/workspace/.persist/venv/`
+2. Runs `/deploy` to pick a model, download it, launch, and benchmark
 
-```bash
-bash /workspace/gpu-inference/setup-workspace.sh
-```
-
-Or step by step:
-```bash
-bash /workspace/gpu-inference/setup-workspace.sh --no-inference  # setup only
-bash /workspace/gpu-inference/start.sh                           # launch server
-```
 
 ### What persists across workspace resets (on /workspace disk):
 - `/workspace/.persist/venv/` — Python venv with vllm
-- `/workspace/.persist/claude-data/` — Claude Code binary
 - `/workspace/.persist/claude-config/` — Claude credentials & settings
+- `/workspace/gpu-inference/init.sh` — auto-init script (restores ephemeral state on new pods)
 - `/workspace/models/` — HuggingFace model weights cache
 - `/workspace/gpu-inference/` — this repo (scripts, config, docs)
 
-### What does NOT persist (reinstalled by /setup or setup-workspace.sh):
-- System packages (`nvtop`, etc.) — apt packages are ephemeral on pod restart
-- PATH modifications in `.bashrc`
+### What auto-restores on new pods (via init.sh):
+After first-time setup, `/workspace/gpu-inference/init.sh` is sourced from `.bashrc` on every new pod. It automatically restores:
+- System packages (`nvtop`, `libnuma1`)
+- Claude Code (via `curl -fsSL https://claude.ai/install.sh | bash`)
+- Claude config symlink (`~/.claude` → `/workspace/.persist/claude-config`)
+- PATH (`~/.local/bin`)
+
+**You do NOT need to re-run `/setup` when switching GPUs** — just open a shell (init.sh auto-fires) and everything is ready. Only run `/setup` on a brand-new network volume.
+
+### What does NOT persist (but auto-restores):
+- System packages (`nvtop`, etc.) — reinstalled by `init.sh` on first login
+- `.bashrc` init hook — must exist for auto-restore to work (self-installed by `init.sh` on first run)
 
 ## Engine Choice: vLLM vs SGLang
 
