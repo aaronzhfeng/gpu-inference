@@ -37,37 +37,86 @@ Use this info throughout the flow to make smart recommendations. Key VRAM tiers:
 
 ## Step 1: Ask what the user wants
 
-Use AskUserQuestion. Tailor recommendations based on the detected GPU:
+Use AskUserQuestion with **multiSelect: true** so users can deploy multiple models simultaneously.
 
-**Question:** "What model do you want to deploy? (Detected: <GPU_NAME>, <VRAM> GB)"
-**Header:** "Model"
-**Options** (include all known models, mark recommended based on GPU):
-1. **Qwen3.5-27B-FP8** — ~27 GB VRAM. FP8 quantized, near-bf16 quality. Best quality available for single-GPU. Mark as "(Recommended)" if VRAM >= 40 GB.
-2. **Qwen3.5-27B** — ~54 GB VRAM (bf16). Full precision. Mark as "(Recommended)" if VRAM >= 80 GB. For 2× GPU setups with 24 GB each, use with `TENSOR_PARALLEL=2`.
-3. **Qwen3.5-9B** — ~17.7 GB VRAM. Thinking/reasoning capable. Mark as "(Recommended)" if VRAM is 24 GB.
-4. **Qwen3.5-4B** — ~8.6 GB VRAM. Fast, no reasoning. Good for high-throughput batch work. Mark as "(Recommended)" if VRAM < 24 GB.
-5. **New model from HuggingFace** — Search for and deploy a model not listed here.
+Pick the **top 4 options** based on the detected GPU VRAM tier. Always include the full model catalog in the question text so users know what's available via "Other".
 
-> **"New model" is always the last option.** If more models have been added above, include them all.
-> Adjust recommendations based on GPU. For 80 GB GPUs, suggest larger models. For multi-GPU, note tensor parallelism.
+### Full Qwen3.5 model catalog
+
+| Model | ID | VRAM (bf16) | Notes |
+|---|---|---|---|
+| Qwen3.5-0.8B | `Qwen/Qwen3.5-0.8B` | ~1.7 GB | Tiny, very fast. Vision-capable. |
+| Qwen3.5-2B | `Qwen/Qwen3.5-2B` | ~4.2 GB | Small, fast. Good for simple tasks. |
+| Qwen3.5-4B | `Qwen/Qwen3.5-4B` | ~8.6 GB | Fast, no reasoning. High-throughput batch. |
+| Qwen3.5-9B | `Qwen/Qwen3.5-9B` | ~17.7 GB | Thinking/reasoning capable. Good quality. |
+| Qwen3.5-27B-FP8 | `Qwen/Qwen3.5-27B-FP8` | ~27 GB | FP8 quantized, near-bf16 quality. |
+| Qwen3.5-27B | `Qwen/Qwen3.5-27B` | ~54 GB | Full precision bf16. |
+| Qwen3.5-35B-A3B | `Qwen/Qwen3.5-35B-A3B` | ~7 GB active | MoE: 35B total, 3B active. Very fast. |
+| Qwen3.5-35B-A3B-FP8 | `Qwen/Qwen3.5-35B-A3B-FP8` | ~18 GB | MoE FP8. Good for 24 GB GPUs. |
+| Qwen3.5-122B-A10B | `Qwen/Qwen3.5-122B-A10B` | ~65 GB | MoE: 122B total, 10B active. |
+| Qwen3.5-122B-A10B-FP8 | `Qwen/Qwen3.5-122B-A10B-FP8` | ~65 GB | MoE FP8. Needs 80 GB GPU. |
+
+### Option selection by GPU VRAM tier
+
+**VRAM < 24 GB:**
+1. Qwen3.5-4B (Recommended) — ~8.6 GB. Fast, no reasoning.
+2. Qwen3.5-2B — ~4.2 GB. Smaller, faster.
+3. Qwen3.5-0.8B — ~1.7 GB. Tiny, fastest. Vision-capable.
+4. Qwen3.5-35B-A3B — ~7 GB active (MoE). 35B quality, 3B speed.
+
+**VRAM 24 GB:**
+1. Qwen3.5-9B (Recommended) — ~17.7 GB. Thinking/reasoning capable.
+2. Qwen3.5-4B — ~8.6 GB. Fast, no reasoning.
+3. Qwen3.5-35B-A3B-FP8 — ~18 GB (MoE FP8). High quality, fast.
+4. Qwen3.5-0.8B — ~1.7 GB. Tiny auxiliary model.
+
+**VRAM 40–48 GB:**
+1. Qwen3.5-27B-FP8 (Recommended) — ~27 GB. Best quality for single-GPU.
+2. Qwen3.5-9B — ~17.7 GB. Thinking/reasoning.
+3. Qwen3.5-4B — ~8.6 GB. Fast auxiliary model.
+4. Qwen3.5-0.8B — ~1.7 GB. Tiny auxiliary model.
+
+**VRAM 80+ GB:**
+1. Qwen3.5-27B (Recommended) — ~54 GB. Full precision bf16.
+2. Qwen3.5-27B-FP8 — ~27 GB. Leaves room for a second model.
+3. Qwen3.5-122B-A10B-FP8 — ~65 GB (MoE). Largest quality.
+4. Qwen3.5-9B — ~17.7 GB. Fast auxiliary model.
+
+**Question format:** "Which models to deploy? Select one or more. (Detected: <GPU_NAME>, <VRAM> GB). Other models available via 'Other': <list remaining models not in options>"
+**Header:** "Models"
+**multiSelect:** true
+
+> Users can pick multiple models (e.g., 27B-FP8 + 0.8B). The deploy flow handles multi-model by assigning different ports and splitting GPU memory.
+> "Other" (auto-provided by AskUserQuestion) covers custom HuggingFace models and any catalog models not in the top 4.
 
 ---
 
-## If user picks an existing model:
+## Step 2: Configure thinking mode
 
-Ask a follow-up question:
+For each selected model, ask about thinking/reasoning. If only one model was selected, use a simple question. If multiple, use multiSelect to indicate which models should have thinking enabled.
 
-**Question:** "Enable thinking/reasoning mode?"
-**Header:** "Thinking"
-**Options:**
-1. **Yes (Recommended for 9B+)** — Step-by-step reasoning in responses. Better quality, more tokens.
-2. **No** — Direct answers only. Faster, fewer tokens.
+**For single model:**
+- **Question:** "Enable thinking/reasoning mode?"
+- **Header:** "Thinking"
+- **Options:**
+  1. **Yes (Recommended for 9B+)** — Step-by-step reasoning in responses. Better quality, more tokens.
+  2. **No** — Direct answers only. Faster, fewer tokens.
+
+**For multiple models:**
+- **Question:** "Enable thinking for which models?"
+- **Header:** "Thinking"
+- **multiSelect:** true
+- **Options:** List each selected model as an option. Mark models 9B+ as "(Recommended)". For 0.8B/2B/4B, add "(not recommended — too small for useful reasoning)" in description.
+
+**Default thinking recommendations:**
+- 0.8B, 2B, 4B: thinking OFF (too small, quality degrades)
+- 9B, 27B, 27B-FP8, 35B-A3B, 122B-A10B: thinking ON
 
 Then proceed to **Step 3: Deploy**.
 
 ---
 
-## If user picks "New model from HuggingFace":
+## If user picks "Other" (new model from HuggingFace):
 
 1. Ask the user for the model name/ID (e.g. `Qwen/Qwen3-8B`, `mistralai/Mistral-7B-Instruct-v0.3`)
 2. Search HuggingFace for the model:
@@ -110,25 +159,57 @@ If confirmed, proceed to **Step 3: Deploy**.
 
 ## Step 3: Deploy
 
-### 1. Stop any running server:
+### 0. Multi-model port and memory planning
+
+When deploying multiple models, plan port assignments and GPU memory splits **before** launching anything.
+
+**Port assignment:**
+- First/largest model: port 8000
+- Second model: port 8002 (port 8001 is often used by nginx on RunPod)
+- Third model: port 8003
+- Fourth model: port 8004, etc.
+
+**GPU memory splitting:**
+When multiple models share a GPU, `gpu_memory_utilization` values must sum to ≤ 0.95 (leave 5% headroom).
+
+Calculate each model's share based on its weight size relative to total VRAM:
+1. Sum all model weight sizes (e.g., 27 GB + 1.7 GB = 28.7 GB)
+2. Each model gets: `(model_weight_size / total_VRAM) + KV_cache_bonus`
+3. KV cache bonus: give larger models ~0.05 extra, smaller models ~0.10 extra (small models benefit more from proportionally larger KV cache)
+4. Verify sum ≤ 0.95
+
+**CRITICAL: KV cache must be large enough for concurrent requests.** If the KV cache is too small, vLLM will serialize requests (Running: 1, Waiting: N) and throughput won't scale with concurrency. Each concurrent request needs `max_model_len × per_token_KV_size` bytes of cache. Prioritize KV cache for the larger model — it's usually the bottleneck.
+
+**Also consider reducing `max_model_len`** when co-hosting. 2048 instead of 4096 halves per-request KV usage, doubling concurrent capacity.
+
+**Example for RTX A6000 (48 GB) with 27B-FP8 + 0.8B:**
+- 27B-FP8: 0.80 (36.8 GB — 27 GB model + 4.75 GB KV cache for ~9 concurrent reqs at max_model_len=2048)
+- 0.8B: 0.15 (6.9 GB — 1.7 GB model + 5.2 GB KV cache)
+- Total: 0.95 — leaves 2.3 GB headroom
+- Result: 227 tok/s at c=64 (vs 14.5 tok/s with gpu_mem_util=0.70 and max_model_len=4096)
+
+### 1. Stop any running servers:
 ```bash
 pkill -f "vllm.entrypoints" 2>/dev/null || true
 sleep 2
 ```
 
-### 2. Download model if not cached:
+### 2. Download all models (in parallel if multiple):
 ```bash
 source /workspace/.persist/venv/bin/activate
 export HF_HOME=/workspace/models
-huggingface-cli download <MODEL_ID>
+huggingface-cli download <MODEL_ID_1> &
+huggingface-cli download <MODEL_ID_2> &
+wait
 ```
 
-### 3. Determine launch flags based on GPU + model:
+### 3. Determine launch flags for each model:
 
 **GPU memory utilization:**
-- Model uses < 50% of VRAM → `0.90` (plenty of room for KV cache)
-- Model uses 50-75% of VRAM → `0.85`
-- Model uses > 75% of VRAM → `0.80` (tight, leave room for Mamba/KV cache)
+- Single model, uses < 50% of VRAM → `0.90`
+- Single model, uses 50-75% of VRAM → `0.85`
+- Single model, uses > 75% of VRAM → `0.80`
+- Multi-model: use the splitting formula from Step 3.0
 
 **Enforce eager (skip CUDA graph capture):**
 - Default: `false` (CUDA graphs are faster)
@@ -150,27 +231,48 @@ huggingface-cli download <MODEL_ID>
 - If model is too large for available VRAM in bf16, try `--quantization awq` or `--quantization gptq` (model must have quantized variant on HuggingFace)
 - Alternative: use `--quantization fp8` on H100/L40S (hardware FP8 support)
 
-### 4. Launch via start.sh:
+### 4. Launch models sequentially via start.sh:
+
+Launch the **largest model first** (it takes longest and claims GPU memory first), then launch smaller models.
+
 ```bash
-MODEL=<MODEL_ID> \
+# Model 1 (largest)
+MODEL=<MODEL_ID_1> \
 ENABLE_THINKING=<true|false> \
 ENFORCE_EAGER=<true|false> \
 GPU_MEMORY_UTILIZATION=<value> \
 MAX_MODEL_LEN=<value> \
-EXTRA_ARGS="<any extra flags like --tensor-parallel-size 2>" \
+PORT=8000 \
+EXTRA_ARGS="<any extra flags>" \
 bash /workspace/gpu-inference/start.sh &
 ```
 
-### 5. Poll health every 30 seconds (up to 5 minutes):
+Wait for the first model to be healthy before launching the next (to avoid GPU memory contention during loading):
+
 ```bash
-curl -s http://localhost:8000/health
+# Poll until healthy, then launch model 2
+MODEL=<MODEL_ID_2> \
+PORT=8002 \
+GPU_MEMORY_UTILIZATION=<value> \
+... \
+bash /workspace/gpu-inference/start.sh &
 ```
 
-**Longer timeout for large models:** If model is > 20B params or multi-GPU, extend timeout to 10 minutes (large models take longer to load and compile).
+### 5. Poll health for each model:
 
-### 6. Smoke test:
+Use HTTP status code check (not body grep — vLLM returns empty body with 200):
 ```bash
-curl -s http://localhost:8000/v1/chat/completions \
+curl -s -o /dev/null -w "%{http_code}" http://localhost:<PORT>/health
+```
+
+Poll every 15-30 seconds. Timeouts:
+- Models < 10B: 5 minutes
+- Models 10-30B: 10 minutes
+- Models > 30B or multi-GPU: 15 minutes
+
+### 6. Smoke test each model:
+```bash
+curl -s http://localhost:<PORT>/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{"model":"<MODEL_ID>","messages":[{"role":"user","content":"What is 2+2? Answer in one word."}],"max_tokens":64}'
 ```
@@ -198,11 +300,14 @@ If auto-recovery fails after 2 attempts, stop and report to the user with diagno
 
 Run after successful deployment to characterize performance on this specific GPU.
 
-### a. Run concurrency sweep:
+### a. Run concurrency sweep for each deployed model:
 ```bash
 source /workspace/.persist/venv/bin/activate
-python /workspace/gpu-inference/benchmark.py
+# For each model, run benchmark against its port:
+python /workspace/gpu-inference/benchmark.py --port <PORT>
 ```
+
+If benchmark.py doesn't support `--port`, use an inline script that hits the correct port (see the 0.8B benchmark example in conversation history), or temporarily modify the URL constant.
 
 ### b. Analyze results:
 - Find concurrency with highest tok/s
@@ -221,6 +326,9 @@ python /workspace/gpu-inference/benchmark.py
 | H100-80GB | Qwen3.5-27B-FP8 | fp8 | TBD | TBD | |
 | A40 (48 GB) | Qwen3.5-27B-FP8 | fp8 | ~398 | 32–64 | enforce-eager required, ~37.5 GB VRAM |
 | A40 (48 GB) | Qwen3.5-9B | bf16 | ~1,238 | 64 | CUDA graphs OK, ~17.7 GB model + large KV cache |
+| A40 (48 GB) | Qwen3.5-0.8B | bf16 | ~4,935 | 64 | co-hosted with 27B-FP8, gpu_mem_util=0.28 |
+| RTX A6000 (48 GB) | Qwen3.5-27B-FP8 | fp8 | ~227 | 64 | co-hosted with 0.8B, gpu_mem_util=0.80, max_model_len=2048, enforce-eager required |
+| RTX A6000 (48 GB) | Qwen3.5-0.8B | bf16 | ~3,201 | 64 | co-hosted with 27B-FP8, gpu_mem_util=0.15 |
 
 > Fill in TBD entries as you benchmark on new GPUs. Add new rows for new GPU + model combos.
 
@@ -298,18 +406,21 @@ Print the full deployment info (same as DEPLOYED.md) directly in the response so
 
 ---
 
-## Step 6: Register new model (only for "New model from HuggingFace")
+## Step 6: Register new model or GPU results
 
-After a successful deployment of a new model, **update this file** so future `/deploy` runs include it:
+### For "Other" (custom HuggingFace model):
+After a successful deployment, **update this file** so future `/deploy` runs include it:
 
 1. Read this file (`/workspace/gpu-inference/.claude/commands/deploy.md`)
-2. In the **Step 1** options list, insert a new numbered option **before** "New model from HuggingFace" with:
-   - Model name and ID
-   - Approximate VRAM usage discovered during deployment
-   - Key characteristics (reasoning capable, architecture type, etc.)
-   - Any required flags discovered (e.g., `--enforce-eager`)
-   - Which GPUs it was tested on
-3. Add benchmark results to the **Reference baselines** table in Step 4
-4. Update CLAUDE.md if the new model has notable quirks or launch requirements
+2. Add the model to the **Full Qwen3.5 model catalog** table in Step 1
+3. Add it to the relevant **VRAM tier option lists** in Step 1
+4. Add benchmark results to the **Reference baselines** table in Step 4
+5. Update CLAUDE.md if the new model has notable quirks or launch requirements
+
+### For existing catalog models on a new GPU:
+If you deployed a known model on a GPU that doesn't have a baseline yet:
+
+1. Add a new row to the **Reference baselines** table in Step 4 with the GPU + model combo
+2. Include co-hosting notes if applicable (e.g., "co-hosted with 0.8B, gpu_mem_util=0.70")
 
 This ensures the model list and performance data grow over time across different GPUs and models.
